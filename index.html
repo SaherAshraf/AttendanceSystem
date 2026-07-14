@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام إدارة الحضور والانصراف | Attendance Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #131829;
+    --bg-card: #1a2138;
+    --bg-card-hover: #212a45;
+    --border: rgba(255,255,255,0.08);
+    --border-hover: rgba(16,185,129,0.3);
+    --text-primary: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --accent: #10b981;
+    --accent-glow: rgba(16,185,129,0.4);
+    --accent-2: #f59e0b;
+    --accent-3: #38bdf8;
+    --accent-4: #ec4899;
+    --danger: #ef4444;
+    --purple: #8b5cf6;
+  }
+
+  * { font-family: 'Tajawal', sans-serif; }
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -10%, rgba(16,185,129,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, rgba(56,189,248,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 50% 50%, rgba(245,158,11,0.04) 0%, transparent 70%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glass {
+    background: rgba(26, 33, 56, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .glass:hover {
+    border-color: var(--border-hover);
+    background: rgba(26, 33, 56, 0.7);
+  }
+
+  .stat-card { position: relative; overflow: hidden; }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 120px; height: 120px; border-radius: 50%;
+    filter: blur(60px); opacity: 0.5; transition: all 0.5s ease;
+  }
+  .stat-card:hover::before { opacity: 0.8; transform: scale(1.3); }
+  .stat-card.c1::before { background: var(--accent); }
+  .stat-card.c2::before { background: var(--accent-3); }
+  .stat-card.c3::before { background: var(--accent-2); }
+  .stat-card.c4::before { background: var(--accent-4); }
+
+  .stat-value {
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .input-field {
+    background: rgba(10, 14, 26, 0.6); border: 1px solid var(--border);
+    color: var(--text-primary); transition: all 0.25s ease;
+  }
+  .input-field:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.15); background: rgba(10, 14, 26, 0.9);
+  }
+  .input-field::placeholder { color: var(--text-dim); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent) 0%, #059669 100%); color: #fff;
+    transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(16,185,129,0.25);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(16,185,129,0.45); }
+
+  .btn-secondary {
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    color: var(--text-primary); transition: all 0.25s ease;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+
+  .table-row { transition: all 0.2s ease; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .table-row:hover { background: rgba(16,185,129,0.04); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .badge-in { background: rgba(16,185,129,0.12); color: var(--accent); border: 1px solid rgba(16,185,129,0.25); }
+  .badge-out { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.25); }
+  .badge-break-out { background: rgba(245,158,11,0.12); color: var(--accent-2); border: 1px solid rgba(245,158,11,0.25); }
+  .badge-break-in { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.25); }
+
+  .pulse-dot {
+    width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 0 0 var(--accent-glow); animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+    70% { box-shadow: 0 0 0 12px rgba(16,185,129,0); }
+    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  }
+
+  .fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; }
+  @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } from { opacity: 0; transform: translateY(10px); } }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-3) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+  .scrollbar::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.3); border-radius: 10px; }
+  .scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16,185,129,0.5); }
+
+  .modal-backdrop { background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); }
+
+  .progress-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  .chart-container { position: relative; height: 280px; }
+
+  .tab-btn {
+    position: relative; padding: 10px 18px; color: var(--text-muted);
+    font-weight: 600; cursor: pointer; transition: color 0.2s; border-radius: 10px;
+  }
+  .tab-btn.active { color: var(--accent); background: rgba(16,185,129,0.08); }
+  .tab-btn:hover:not(.active) { color: var(--text-primary); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
+    padding: 14px 24px; border-radius: 12px; font-weight: 600; z-index: 1000;
+    opacity: 0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { background: var(--accent); color: #fff; }
+  .toast.error { background: var(--danger); color: #fff; }
+  .toast.info { background: var(--accent-3); color: #fff; }
+</style>
+</head>
+<body class="relative">
+
+<!-- ===== Header ===== -->
+<header class="relative z-10 glass border-b border-white/5">
+  <div class="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+        <i class="fas fa-fingerprint text-white text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-black gradient-text">نظام الحضور والانصراف</h1>
+        <p class="text-xs text-slate-400 flex items-center gap-2">
+          <span class="pulse-dot"></span>
+          <span id="connectionStatus">جاهز للاتصال</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button onclick="openSettingsModal()" class="btn-secondary px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold">
+        <i class="fas fa-link"></i>
+        <span class="hidden md:inline">ربط Google Sheet</span>
+      </button>
+      <button onclick="loadDemoData()" class="btn-secondary px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold">
+        <i class="fas fa-flask"></i>
+        <span class="hidden md:inline">بيانات تجريبية</span>
+      </button>
+      <button onclick="refreshData()" class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold">
+        <i class="fas fa-sync-alt"></i>
+        <span>تحديث</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Main ===== -->
+<main class="relative z-10 max-w-[1600px] mx-auto px-6 py-8">
+
+  <!-- Filters Bar -->
+  <section class="glass rounded-2xl p-5 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+      <div class="md:col-span-4">
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">بحث (الاسم / ID / الفرع)</label>
+        <div class="relative">
+          <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+          <input id="searchInput" type="text" placeholder="ابحث باسم الموظف أو رقمه أو الفرع..."
+            class="input-field w-full pr-10 pl-4 py-2.5 rounded-xl text-sm">
+        </div>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">الفرع</label>
+        <select id="branchFilter" class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
+          <option value="">كل الفروع</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">الحالة</label>
+        <select id="statusFilter" class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
+          <option value="">الكل</option>
+          <option value="check-in">حضور (Check-in)</option>
+          <option value="check-out">انصراف (Check-out)</option>
+          <option value="break-out">خروج استراحة (Break-out)</option>
+          <option value="break-in">عودة استراحة (Break-in)</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">من تاريخ</label>
+        <input id="dateFrom" type="date" class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">إلى تاريخ</label>
+        <input id="dateTo" type="date" class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-white/5">
+      <div class="flex items-center gap-2 text-sm text-slate-400">
+        <i class="fas fa-filter text-emerald-500"></i>
+        <span>عدد السجلات المعروضة: <span id="recordsCount" class="text-white font-bold">0</span></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="clearFilters()" class="btn-secondary px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i class="fas fa-times"></i> مسح الفلاتر
+        </button>
+        <button onclick="exportCSV()" class="btn-secondary px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i class="fas fa-file-csv"></i> تصدير CSV
+        </button>
+        <button onclick="exportReport()" class="btn-primary px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5">
+          <i class="fas fa-file-pdf"></i> تقرير PDF
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Cards -->
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+    <div class="stat-card c1 glass rounded-2xl p-5">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-xs text-slate-400 font-semibold mb-1">إجمالي الموظفين</p>
+          <h3 class="text-3xl font-black stat-value" id="statEmployees">0</h3>
+        </div>
+        <div class="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+          <i class="fas fa-users text-emerald-400"></i>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-emerald-400 font-bold"><i class="fas fa-arrow-trend-up"></i></span>
+        <span class="text-slate-400">نشط في الفترة المحددة</span>
+      </div>
+    </div>
+
+    <div class="stat-card c2 glass rounded-2xl p-5">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-xs text-slate-400 font-semibold mb-1">صافي ساعات العمل</p>
+          <h3 class="text-3xl font-black stat-value" id="statTotalHours">0<span class="text-lg">س</span></h3>
+        </div>
+        <div class="w-11 h-11 rounded-xl bg-sky-500/15 flex items-center justify-center">
+          <i class="fas fa-clock text-sky-400"></i>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-sky-400 font-bold"><i class="fas fa-calendar-week"></i></span>
+        <span class="text-slate-400">بعد خصم الاستراحات</span>
+      </div>
+    </div>
+
+    <div class="stat-card c3 glass rounded-2xl p-5">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-xs text-slate-400 font-semibold mb-1">متوسط ساعات/يوم</p>
+          <h3 class="text-3xl font-black stat-value" id="statAvgHours">0<span class="text-lg">س</span></h3>
+        </div>
+        <div class="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center">
+          <i class="fas fa-chart-line text-amber-400"></i>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-amber-400 font-bold"><i class="fas fa-bullseye"></i></span>
+        <span class="text-slate-400">لكل موظف يومياً</span>
+      </div>
+    </div>
+
+    <div class="stat-card c4 glass rounded-2xl p-5">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-xs text-slate-400 font-semibold mb-1">معدل الالتزام</p>
+          <h3 class="text-3xl font-black stat-value" id="statAttendanceRate">0<span class="text-lg">%</span></h3>
+        </div>
+        <div class="w-11 h-11 rounded-xl bg-pink-500/15 flex items-center justify-center">
+          <i class="fas fa-user-check text-pink-400"></i>
+        </div>
+      </div>
+      <div class="progress-bar mt-2">
+        <div id="attendanceBar" class="progress-fill bg-gradient-to-r from-pink-500 to-rose-500" style="width:0%"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Charts -->
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+    <div class="glass rounded-2xl p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-bold text-lg">ساعات العمل اليومية</h3>
+          <p class="text-xs text-slate-400">صافي ساعات العمل الفعلية عبر الفترة المحددة</p>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="hoursChart"></canvas>
+      </div>
+    </div>
+
+    <div class="glass rounded-2xl p-5">
+      <div class="mb-4">
+        <h3 class="font-bold text-lg">توزيع الفروع</h3>
+        <p class="text-xs text-slate-400">نسبة ساعات العمل لكل فرع</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="branchChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- Top Employees -->
+  <section class="glass rounded-2xl p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="font-bold text-lg">أكثر الموظفين التزاماً</h3>
+        <p class="text-xs text-slate-400">ترتيب الموظفين حسب صافي ساعات العمل</p>
+      </div>
+      <i class="fas fa-trophy text-amber-400 text-xl"></i>
+    </div>
+    <div id="topEmployees" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+  </section>
+
+  <!-- Records Table -->
+  <section class="glass rounded-2xl overflow-hidden">
+    <div class="p-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="font-bold text-lg">سجلات الحضور والانصراف</h3>
+        <p class="text-xs text-slate-400">السجلات التفصيلية لكل موظف</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="setView('records')" id="viewRecords" class="tab-btn active text-xs">
+          <i class="fas fa-list ml-1"></i> السجلات
+        </button>
+        <button onclick="setView('summary')" id="viewSummary" class="tab-btn text-xs">
+          <i class="fas fa-table ml-1"></i> ملخص الموظفين
+        </button>
+      </div>
+    </div>
+
+    <!-- Records View -->
+    <div id="recordsView" class="overflow-x-auto scrollbar">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs text-slate-400 bg-black/20">
+            <th class="text-right p-4 font-semibold">الموظف</th>
+            <th class="text-right p-4 font-semibold">User ID</th>
+            <th class="text-right p-4 font-semibold">الفرع</th>
+            <th class="text-right p-4 font-semibold">التاريخ</th>
+            <th class="text-right p-4 font-semibold">الوقت</th>
+            <th class="text-right p-4 font-semibold">الحالة</th>
+            <th class="text-right p-4 font-semibold">سجل في</th>
+          </tr>
+        </thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+      <div id="emptyState" class="hidden py-16 text-center">
+        <i class="fas fa-inbox text-5xl text-slate-600 mb-3"></i>
+        <p class="text-slate-400">لا توجد سجلات مطابقة للفلاتر المحددة</p>
+      </div>
+    </div>
+
+    <!-- Summary View -->
+    <div id="summaryView" class="hidden overflow-x-auto scrollbar">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs text-slate-400 bg-black/20">
+            <th class="text-right p-4 font-semibold">الموظف</th>
+            <th class="text-right p-4 font-semibold">User ID</th>
+            <th class="text-right p-4 font-semibold">الفرع</th>
+            <th class="text-right p-4 font-semibold">أيام العمل</th>
+            <th class="text-right p-4 font-semibold">صافي الساعات</th>
+            <th class="text-right p-4 font-semibold">وقت الاستراحة</th>
+            <th class="text-right p-4 font-semibold">متوسط/يوم</th>
+            <th class="text-right p-4 font-semibold">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+
+    <div class="p-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+      <span>عرض <span id="visibleCount">0</span> من <span id="totalCount">0</span> سجل</span>
+      <div class="flex items-center gap-1">
+        <button onclick="prevPage()" class="btn-secondary w-8 h-8 rounded-lg flex items-center justify-center">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+        <span id="pageInfo" class="px-3 font-semibold">صفحة 1</span>
+        <button onclick="nextPage()" class="btn-secondary w-8 h-8 rounded-lg flex items-center justify-center">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== Settings Modal ===== -->
+<div id="settingsModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop p-4">
+  <div class="glass rounded-2xl p-6 max-w-md w-full">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold flex items-center gap-2">
+        <i class="fas fa-link text-emerald-400"></i> ربط Google Sheet
+      </h3>
+      <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs text-slate-400 mb-2 font-semibold">رابط الـ Web App URL</label>
+        <input id="webAppUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+          class="input-field w-full px-4 py-2.5 rounded-xl text-sm" dir="ltr">
+      </div>
+      <button onclick="saveSettings()" class="btn-primary w-full py-2.5 rounded-xl font-bold">
+        <i class="fas fa-save ml-2"></i> حفظ واتصال
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Employee Details Modal ===== -->
+<div id="employeeModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop p-4">
+  <div class="glass rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar">
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center font-bold text-white text-lg" id="empAvatar">?</div>
+        <div>
+          <h3 id="empModalName" class="text-lg font-bold">اسم الموظف</h3>
+          <p id="empModalId" class="text-xs text-slate-400">ID: ---</p>
+        </div>
+      </div>
+      <button onclick="closeEmployeeModal()" class="text-slate-400 hover:text-white">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    <div id="empModalContent"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let allRecords = [];
+let filteredRecords = [];
+let currentPage = 1;
+const PAGE_SIZE = 15;
+let currentView = 'records';
+let hoursChart, branchChart;
+let webAppUrl = localStorage.getItem('attendanceWebAppUrl') || '';
+
+const EMPLOYEE_NAMES = [
+  'أحمد محمد علي', 'فاطمة الزهراء حسن', 'محمد عبد الرحمن', 'سارة أحمد إبراهيم',
+  'خالد سعيد العمري', 'نورا فهد القحطاني', 'عمر ياسين خليل', 'ليلى محمود سعيد',
+  'يوسف الحسن إبراهيم', 'هند ناصر الدوسري'
+];
+const BRANCHES = ['الرياض - المركز', 'جدة - الفرع الرئيسي', 'الدمام - الفرع الشرقي'];
+
+function generateDemoData() {
+  const records = [];
+  const today = new Date();
+  for (let d = 15; d >= 0; d--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - d);
+    if (date.getDay() === 5 || date.getDay() === 6) continue; 
+
+    EMPLOYEE_NAMES.forEach((name, idx) => {
+      const userId = 'EMP' + String(1001 + idx);
+      const branch = BRANCHES[idx % BRANCHES.length];
+
+      const checkIn = new Date(date);
+      checkIn.setHours(8, Math.floor(Math.random() * 30), 0, 0);
+      records.push({ user_id: userId, name, timestamp: checkIn.toISOString(), status: 'check-in', device_name: branch, logged_at: checkIn.toISOString() });
+
+      // Break out
+      const breakOut = new Date(date);
+      breakOut.setHours(12, Math.floor(Math.random() * 15), 0, 0);
+      records.push({ user_id: userId, name, timestamp: breakOut.toISOString(), status: 'break-out', device_name: branch, logged_at: breakOut.toISOString() });
+
+      // Break in
+      const breakIn = new Date(breakOut);
+      breakIn.setHours(13, 0, 0, 0);
+      records.push({ user_id: userId, name, timestamp: breakIn.toISOString(), status: 'break-in', device_name: branch, logged_at: breakIn.toISOString() });
+
+      const checkOut = new Date(date);
+      checkOut.setHours(16 + Math.floor(Math.random() * 2), Math.floor(Math.random() * 60), 0, 0);
+      records.push({ user_id: userId, name, timestamp: checkOut.toISOString(), status: 'check-out', device_name: branch, logged_at: checkOut.toISOString() });
+    });
+  }
+  return records;
+}
+
+async function refreshData() {
+  if (!webAppUrl) { showToast('error', 'لم يتم ربط Google Sheet. استخدم البيانات التجريبية'); return; }
+  showToast('info', 'جاري جلب البيانات...');
+  try {
+    const url = webAppUrl + (webAppUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(url);
+    const data = JSON.parse(await res.text());
+    allRecords = data.records || data || [];
+    processRecords();
+    showToast('success', `تم تحميل ${allRecords.length} سجل`);
+  } catch (err) { showToast('error', 'فشل الاتصال'); }
+}
+
+function loadDemoData() {
+  allRecords = generateDemoData();
+  processRecords();
+  showToast('success', `تم تحميل ${allRecords.length} سجل تجريبي`);
+  document.getElementById('connectionStatus').textContent = 'بيانات تجريبية';
+}
+
+function processRecords() {
+  populateBranchFilter();
+  if (allRecords.length > 0) {
+    const dates = allRecords.map(r => new Date(r.timestamp).getTime());
+    document.getElementById('dateFrom').value = new Date(Math.min(...dates)).toISOString().split('T')[0];
+    document.getElementById('dateTo').value = new Date(Math.max(...dates)).toISOString().split('T')[0];
+  }
+  applyFilters();
+}
+
+function populateBranchFilter() {
+  const branches = [...new Set(allRecords.map(r => r.device_name))].filter(Boolean).sort();
+  const select = document.getElementById('branchFilter');
+  select.innerHTML = '<option value="">كل الفروع</option>';
+  branches.forEach(b => select.appendChild(new Option(b, b)));
+}
+
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const branch = document.getElementById('branchFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+
+  filteredRecords = allRecords.filter(r => {
+    if (search && !(r.name?.toLowerCase().includes(search) || r.user_id?.toLowerCase().includes(search) || r.device_name?.toLowerCase().includes(search))) return false;
+    if (branch && r.device_name !== branch) return false;
+    if (status && r.status !== status) return false;
+    if (dateFrom || dateTo) {
+      const recDate = new Date(r.timestamp).toISOString().split('T')[0];
+      if (dateFrom && recDate < dateFrom) return false;
+      if (dateTo && recDate > dateTo) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  currentPage = 1;
+  renderAll();
+}
+
+// Normalize status for easier logic
+function getStatusType(status) {
+  const s = (status || '').toLowerCase().replace(/[\s-]/g, '');
+  if (s.includes('checkin') || s === 'in') return 'check-in';
+  if (s.includes('checkout') || s === 'out') return 'check-out';
+  if (s.includes('breakout')) return 'break-out';
+  if (s.includes('breakin')) return 'break-in';
+  return s;
+}
+
+function calculateEmployeeStats(records) {
+  const byUser = {};
+  records.forEach(r => {
+    if (!byUser[r.user_id]) byUser[r.user_id] = { name: r.name, user_id: r.user_id, device_name: r.device_name, days: {} };
+    const dateKey = new Date(r.timestamp).toISOString().split('T')[0];
+    if (!byUser[r.user_id].days[dateKey]) byUser[r.user_id].days[dateKey] = [];
+    byUser[r.user_id].days[dateKey].push({ time: new Date(r.timestamp), status: getStatusType(r.status) });
+  });
+
+  const stats = [];
+  Object.values(byUser).forEach(emp => {
+    let totalWorkHours = 0, totalBreakHours = 0, workDays = 0;
+
+    Object.entries(emp.days).forEach(([dateKey, events]) => {
+      events.sort((a, b) => a.time - b.time);
+      
+      let firstIn = null, lastOut = null, lastEvent = null, breakDuration = 0;
+      
+      events.forEach(e => {
+        if (e.status === 'check-in') { if(!firstIn) firstIn = e.time; }
+        else if (e.status === 'check-out') { lastOut = e.time; }
+        else if (e.status === 'break-out') { /* handled in break-in */ }
+        else if (e.status === 'break-in') {
+           const breakOutEvent = events.find(ev => ev.status === 'break-out' && ev.time < e.time);
+           if (breakOutEvent) breakDuration += (e.time - breakOutEvent.time);
+        }
+      });
+
+      if (firstIn && lastOut) {
+        const totalPresence = (lastOut - firstIn) / (1000 * 60 * 60);
+        const breakH = breakDuration / (1000 * 60 * 60);
+        const workH = totalPresence - breakH;
+        
+        if (workH > 0 && workH < 24) {
+          totalWorkHours += workH;
+          totalBreakHours += breakH;
+          workDays++;
+        }
+      }
+    });
+
+    stats.push({
+      name: emp.name, user_id: emp.user_id, device_name: emp.device_name,
+      totalWorkHours, totalBreakHours, workDays,
+      avgPerDay: workDays > 0 ? totalWorkHours / workDays : 0
+    });
+  });
+  return stats;
+}
+
+function renderAll() { renderStats(); renderCharts(); renderTopEmployees(); renderTable(); renderSummary(); }
+
+function renderStats() {
+  const stats = calculateEmployeeStats(filteredRecords);
+  const totalHours = stats.reduce((s, e) => s + e.totalWorkHours, 0);
+  const avgHours = stats.length > 0 ? totalHours / stats.length : 0;
+  
+  document.getElementById('statEmployees').textContent = stats.length;
+  document.getElementById('statTotalHours').innerHTML = totalHours.toFixed(1) + '<span class="text-lg">س</span>';
+  document.getElementById('statAvgHours').innerHTML = avgHours.toFixed(1) + '<span class="text-lg">س</span>';
+  
+  let rate = 0;
+  if (filteredRecords.length > 0) {
+    const dates = [...new Set(filteredRecords.map(r => new Date(r.timestamp).toISOString().split('T')[0]))];
+    rate = dates.length > 0 ? (stats.reduce((s,e)=>s+e.workDays,0) / (dates.length * stats.length)) * 100 : 0;
+  }
+  document.getElementById('statAttendanceRate').innerHTML = Math.min(100,rate).toFixed(0) + '<span class="text-lg">%</span>';
+  document.getElementById('attendanceBar').style.width = Math.min(100, rate) + '%';
+}
+
+function renderCharts() {
+  if (hoursChart) hoursChart.destroy();
+  if (branchChart) branchChart.destroy();
+  
+  const byDate = {};
+  filteredRecords.forEach(r => {
+    const dateKey = new Date(r.timestamp).toISOString().split('T')[0];
+    if (!byDate[dateKey]) byDate[dateKey] = [];
+    byDate[dateKey].push({ time: new Date(r.timestamp), status: getStatusType(r.status) });
+  });
+
+  const labels = [], data = [];
+  Object.keys(byDate).sort().forEach(dateKey => {
+    labels.push(new Date(dateKey).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }));
+    const events = byDate[dateKey].sort((a,b) => a.time - b.time);
+    let firstIn = null, lastOut = null, breakDur = 0;
+    events.forEach(e => {
+      if (e.status === 'check-in' && !firstIn) firstIn = e.time;
+      if (e.status === 'check-out') lastOut = e.time;
+      if (e.status === 'break-in') {
+        const bo = events.find(ev => ev.status === 'break-out' && ev.time < e.time);
+        if (bo) breakDur += (e.time - bo.time);
+      }
+    });
+    if (firstIn && lastOut) data.push((((lastOut - firstIn) - breakDur) / (1000*60*60)).toFixed(1));
+    else data.push(0);
+  });
+
+  const ctx1 = document.getElementById('hoursChart').getContext('2d');
+  const g1 = ctx1.createLinearGradient(0, 0, 0, 280);
+  g1.addColorStop(0, 'rgba(16,185,129,0.5)'); g1.addColorStop(1, 'rgba(16,185,129,0)');
+  hoursChart = new Chart(ctx1, {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'ساعات العمل', data, borderColor: '#10b981', backgroundColor: g1, fill: true, tension: 0.4, pointRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } } } }
+  });
+
+  const branchHours = {};
+  calculateEmployeeStats(filteredRecords).forEach(e => {
+    const b = e.device_name || 'غير محدد';
+    if (!branchHours[b]) branchHours[b] = 0;
+    branchHours[b] += e.totalWorkHours;
+  });
+
+  const ctx2 = document.getElementById('branchChart').getContext('2d');
+  branchChart = new Chart(ctx2, {
+    type: 'doughnut',
+    data: { labels: Object.keys(branchHours), datasets: [{ data: Object.values(branchHours), backgroundColor: ['#10b981', '#38bdf8', '#f59e0b', '#ec4899'], borderColor: '#0a0e1a', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Tajawal' } } } } }
+  });
+}
+
+function renderTopEmployees() {
+  const top = calculateEmployeeStats(filteredRecords).sort((a,b) => b.totalWorkHours - a.totalWorkHours).slice(0, 6);
+  const max = top[0]?.totalWorkHours || 1;
+  document.getElementById('topEmployees').innerHTML = top.map((emp, idx) => {
+    const pct = (emp.totalWorkHours / max) * 100;
+    const medals = ['#fbbf24', '#94a3b8', '#cd7f32'];
+    const color = idx < 3 ? medals[idx] : '#10b981';
+    return `
+      <div class="bg-black/20 rounded-xl p-4 hover:bg-black/30 transition cursor-pointer" onclick="showEmployeeDetails('${emp.user_id}')">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style="background:${color}33;color:${color}">
+            ${idx < 3 ? '<i class="fas fa-medal"></i>' : (idx + 1)}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="font-bold text-sm truncate">${emp.name}</p>
+            <p class="text-xs text-slate-400">${emp.device_name || ''}</p>
+          </div>
+          <div class="text-left">
+            <p class="font-black text-emerald-400">${emp.totalWorkHours.toFixed(1)}س</p>
+            <p class="text-xs text-slate-500">${emp.workDays} يوم</p>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:linear-gradient(90deg,${color},${color}88)"></div></div>
+      </div>`;
+  }).join('') || '<p class="text-slate-400 text-center py-8 col-span-3">لا توجد بيانات</p>';
+}
+
+function getBadgeHTML(status) {
+  const type = getStatusType(status);
+  if (type === 'check-in') return '<span class="badge badge-in"><i class="fas fa-sign-in-alt"></i> حضور</span>';
+  if (type === 'check-out') return '<span class="badge badge-out"><i class="fas fa-sign-out-alt"></i> انصراف</span>';
+  if (type === 'break-out') return '<span class="badge badge-break-out"><i class="fas fa-coffee"></i> خروج استراحة</span>';
+  if (type === 'break-in') return '<span class="badge badge-break-in"><i class="fas fa-mug-hot"></i> عودة استراحة</span>';
+  return `<span class="badge">${status}</span>`;
+}
+
+function renderTable() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRecords = filteredRecords.slice(start, start + PAGE_SIZE);
+  const body = document.getElementById('recordsBody');
+  const empty = document.getElementById('emptyState');
+  
+  if (pageRecords.length === 0) { body.innerHTML = ''; empty.classList.remove('hidden'); }
+  else {
+    empty.classList.add('hidden');
+    body.innerHTML = pageRecords.map(r => {
+      const dt = new Date(r.timestamp);
+      return `
+        <tr class="table-row fade-in">
+          <td class="p-4"><div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center font-bold text-white text-sm">${(r.name||'?').charAt(0)}</div>
+            <span class="font-semibold">${r.name || '—'}</span>
+          </div></td>
+          <td class="p-4"><span class="font-mono text-xs text-slate-400">${r.user_id || '—'}</span></td>
+          <td class="p-4"><span class="text-sm">${r.device_name || '—'}</span></td>
+          <td class="p-4 text-slate-300">${dt.toLocaleDateString('ar-EG', { day:'numeric', month:'short' })}</td>
+          <td class="p-4 font-bold">${dt.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</td>
+          <td class="p-4">${getBadgeHTML(r.status)}</td>
+          <td class="p-4 text-xs text-slate-500">${new Date(r.logged_at).toLocaleString('ar-EG', { hour: '2-digit', minute:'2-digit', day:'numeric', month:'short' })}</td>
+        </tr>`;
+    }).join('');
+  }
+  
+  document.getElementById('visibleCount').textContent = pageRecords.length;
+  document.getElementById('totalCount').textContent = filteredRecords.length;
+  document.getElementById('recordsCount').textContent = filteredRecords.length;
+  document.getElementById('pageInfo').textContent = `صفحة ${currentPage} من ${Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE))}`;
+}
+
+function renderSummary() {
+  const stats = calculateEmployeeStats(filteredRecords);
+  document.getElementById('summaryBody').innerHTML = stats.map(e => `
+    <tr class="table-row">
+      <td class="p-4"><div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center font-bold text-white text-sm">${(e.name||'?').charAt(0)}</div>
+        <span class="font-semibold">${e.name}</span>
+      </div></td>
+      <td class="p-4"><span class="font-mono text-xs text-slate-400">${e.user_id}</span></td>
+      <td class="p-4 text-sm">${e.device_name || '—'}</td>
+      <td class="p-4 font-bold">${e.workDays}</td>
+      <td class="p-4"><span class="text-emerald-400 font-bold">${e.totalWorkHours.toFixed(1)} س</span></td>
+      <td class="p-4"><span class="text-amber-400 font-bold">${e.totalBreakHours.toFixed(1)} س</span></td>
+      <td class="p-4"><span class="text-sky-400 font-bold">${e.avgPerDay.toFixed(1)} س</span></td>
+      <td class="p-4"><button onclick="showEmployeeDetails('${e.user_id}')" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-semibold"><i class="fas fa-eye ml-1"></i> تفاصيل</button></td>
+    </tr>`).join('') || '<tr><td colspan="8" class="p-8 text-center text-slate-400">لا توجد بيانات</td></tr>';
+}
+
+function showEmployeeDetails(userId) {
+  const empRecords = allRecords.filter(r => r.user_id === userId);
+  if (empRecords.length === 0) return;
+  const emp = empRecords[0];
+  document.getElementById('empModalName').textContent = emp.name;
+  document.getElementById('empModalId').textContent = 'ID: ' + emp.user_id + ' | ' + (emp.device_name || '');
+  document.getElementById('empAvatar').textContent = (emp.name || '?').charAt(0);
+  
+  const stats = calculateEmployeeStats(empRecords)[0] || {};
+  const byDate = {};
+  empRecords.forEach(r => {
+    const dk = new Date(r.timestamp).toISOString().split('T')[0];
+    if (!byDate[dk]) byDate[dk] = [];
+    byDate[dk].push(r);
+  });
+
+  const html = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div class="bg-black/30 rounded-xl p-3 text-center"><p class="text-xs text-slate-400 mb-1">أيام العمل</p><p class="text-2xl font-black text-emerald-400">${stats.workDays||0}</p></div>
+      <div class="bg-black/30 rounded-xl p-3 text-center"><p class="text-xs text-slate-400 mb-1">صافي الساعات</p><p class="text-2xl font-black text-sky-400">${(stats.totalWorkHours||0).toFixed(1)}</p></div>
+      <div class="bg-black/30 rounded-xl p-3 text-center"><p class="text-xs text-slate-400 mb-1">وقت الاستراحة</p><p class="text-2xl font-black text-amber-400">${(stats.totalBreakHours||0).toFixed(1)}</p></div>
+      <div class="bg-black/30 rounded-xl p-3 text-center"><p class="text-xs text-slate-400 mb-1">متوسط/يوم</p><p class="text-2xl font-black text-pink-400">${(stats.avgPerDay||0).toFixed(1)}</p></div>
+    </div>
+    <h4 class="font-bold mb-3 text-sm">آخر السجلات</h4>
+    <div class="space-y-2 max-h-80 overflow-y-auto scrollbar">
+      ${Object.keys(byDate).sort().reverse().slice(0, 10).map(dk => {
+        const events = byDate[dk].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const dateStr = new Date(dk).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+        return `
+          <div class="bg-black/20 rounded-xl p-3">
+            <p class="font-semibold text-sm mb-2">${dateStr}</p>
+            <div class="flex flex-wrap gap-2">
+              ${events.map(e => `<span class="badge ${getBadgeHTML(e.status).match(/badge-(\w|-)+/)[0]}"><i class="fas fa-clock"></i> ${new Date(e.timestamp).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})} - ${getBadgeHTML(e.status).replace(/<[^>]*>/g, '').trim()}</span>`).join('')}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+  
+  document.getElementById('empModalContent').innerHTML = html;
+  document.getElementById('employeeModal').classList.remove('hidden');
+  document.getElementById('employeeModal').classList.add('flex');
+}
+
+function closeEmployeeModal() { document.getElementById('employeeModal').classList.add('hidden'); document.getElementById('employeeModal').classList.remove('flex'); }
+function nextPage() { if (currentPage < Math.ceil(filteredRecords.length / PAGE_SIZE)) { currentPage++; renderTable(); } }
+function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+function setView(view) {
+  currentView = view;
+  document.getElementById('viewRecords').classList.toggle('active', view === 'records');
+  document.getElementById('viewSummary').classList.toggle('active', view === 'summary');
+  document.getElementById('recordsView').classList.toggle('hidden', view !== 'records');
+  document.getElementById('summaryView').classList.toggle('hidden', view !== 'summary');
+}
+function clearFilters() {
+  ['searchInput', 'branchFilter', 'statusFilter', 'dateFrom', 'dateTo'].forEach(id => document.getElementById(id).value = '');
+  applyFilters();
+}
+function exportCSV() {
+  if (filteredRecords.length === 0) return;
+  const csv = [['User ID', 'Name', 'Timestamp', 'Status', 'Device Name', 'Logged At'], ...filteredRecords.map(r => [r.user_id, r.name, r.timestamp, r.status, r.device_name, r.logged_at])].map(r => r.map(c => `"${c||''}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `attendance.csv`; a.click();
+}
+function exportReport() { window.print(); }
+function openSettingsModal() { document.getElementById('webAppUrl').value = webAppUrl; document.getElementById('settingsModal').classList.remove('hidden'); document.getElementById('settingsModal').classList.add('flex'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); document.getElementById('settingsModal').classList.remove('flex'); }
+function saveSettings() {
+  webAppUrl = document.getElementById('webAppUrl').value.trim();
+  if (!webAppUrl) return;
+  localStorage.setItem('attendanceWebAppUrl', webAppUrl);
+  closeSettingsModal();
+  document.getElementById('connectionStatus').textContent = 'متصل بـ Google Sheet';
+  refreshData();
+}
+function showToast(type, msg) {
+  const t = document.getElementById('toast');
+  t.className = 'toast ' + type;
+  t.innerHTML = `<i class="fas fa-${type==='success'?'check':type==='error'?'exclamation':'info'}-circle"></i> ${msg}`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+['searchInput', 'branchFilter', 'statusFilter', 'dateFrom', 'dateTo'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyFilters);
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSettingsModal(); closeEmployeeModal(); } });
+
+// Init
+if (webAppUrl) { document.getElementById('connectionStatus').textContent = 'متصل بـ Google Sheet'; refreshData(); }
+else { loadDemoData(); }
+</script>
+</body>
+</html>
