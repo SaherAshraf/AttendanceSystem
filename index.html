@@ -601,9 +601,20 @@ function applyFilters() {
   const dateTo = document.getElementById('dateTo').value;
 
   filteredRecords = allRecords.filter(r => {
-    if (search && !(r.name?.toLowerCase().includes(search) || r.user_id?.toLowerCase().includes(search) || r.device_name?.toLowerCase().includes(search))) return false;
+    if (search) {
+      // تحويل القيم إلى نصوص لتجنب خطأ toLowerCase
+      const name = String(r.name || '').toLowerCase();
+      const userId = String(r.user_id || '').toLowerCase();
+      const device = String(r.device_name || '').toLowerCase();
+      
+      if (!name.includes(search) && !userId.includes(search) && !device.includes(search)) {
+        return false;
+      }
+    }
+    
     if (branch && r.device_name !== branch) return false;
     if (status && r.status !== status) return false;
+    
     if (dateFrom || dateTo) {
       const recDate = new Date(r.timestamp).toISOString().split('T')[0];
       if (dateFrom && recDate < dateFrom) return false;
