@@ -529,12 +529,44 @@ async function refreshData() {
   showToast('info', 'جاري جلب البيانات...');
   try {
     const url = webAppUrl + (webAppUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res = await fetch(url);
-    const data = JSON.parse(await res.text());
-    allRecords = data.records || data || [];
+    const response = await fetch(url);
+    const text = await response.text();
+
+    // التحقق إذا كانت الاستجابة صفحة HTML (صفحة تسجيل الدخول أو خطأ)
+    if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+      showToast('error', 'خطأ في الصلاحيات! تأكد أن نوع الوصول (Who has access) تم ضبطه على Anyone وليس Anyone with Google account.');
+      console.error("Google returned HTML instead of JSON:", text);
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      showToast('error', 'استجابة غير صالحة من الخادم. تأكد من تحديث النشر (New Version) بعد تعديل الكود.');
+      console.error("JSON Parse Error. Response was:", text);
+      return;
+    }
+
+    if (data.success === false) {
+      showToast('error', 'خطأ من الخادم: ' + (data.error || 'غير معروف'));
+      return;
+    }
+
+    if (data.success && data.records) {
+      allRecords = data.records;
+    } else if (Array.isArray(data)) {
+      allRecords = data;
+    } else {
+      allRecords = [];
+    }
+
     processRecords();
-    showToast('success', `تم تحميل ${allRecords.length} سجل`);
-  } catch (err) { showToast('error', 'فشل الاتصال'); }
+    showToast('success', `تم تحميل ${allRecords.length} سجل بنجاح`);
+  } catch (err) {
+    showToast('error', 'فشل الاتصال: ' + err.message);
+    console.error("Fetch Error:", err);
+  }
 }
 
 function loadDemoData() {
